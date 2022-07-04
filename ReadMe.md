@@ -1,4 +1,4 @@
-#DemiScript
+# DemiScript
 
 A direct transcription and annotation viewer for IIIF documents, created by Koray Birenheide for the Johann Wolfgang Goethe-Universität Frankfurt.
 
