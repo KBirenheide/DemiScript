@@ -1,8 +1,9 @@
 class DemiScript
 {
-  constructor(canvas)
+  constructor(canvas, folderprefix, editor=true)
   {
     this.canvas = canvas;
+    this.editor = editor;
     this.tilesources;
     this.iiifmanifest;
     this.viewer;
@@ -15,6 +16,9 @@ class DemiScript
     this.overlaygroups = ["main", "pins"];
     this.curationfolders = [];
     this.curationitems = [];
+    this.folderpath = folderprefix;
+    this.overlays = [];
+    this.additionalCanvasListeners = [];
 
     //Polygon Drawing Parameters
     this.isDrawing = false;
@@ -64,8 +68,24 @@ class DemiScript
              				            }
              				        };
   }
+
+  //Add Canvas listeners externally
+  appendCanvasListener(listener)
+  {
+    var demi = this;
+    demi.additionalCanvasListeners.push(listener);
+    demi.additionalCanvasListeners.forEach(function(listen){
+      if(listen.listener == "object")
+      {
+        demi.castcanvas.forEachObject(function(o){
+          o.on("mousedown", function(){listen.function(o);});
+        });
+      }
+    });
+  }
+
     //Called to asynchronously obtain the indicated IIIF-compliant JSON Manifest
-    constructviewer(demifest, tilesources)
+    constructviewer(demifest, tilesources, callback = function(){})
     {
 
       if (demifest === true)
@@ -81,6 +101,7 @@ class DemiScript
             jQuery.getJSON(this.tilesources).then(data => {
                 resolve(this.setviewer(demifest, data, tilesources));
                 resolve(this.iiifmanifest = data);
+                callback();
             }, error => {
               reject(console.log("failed to load tile sources"));
             });
@@ -92,10 +113,10 @@ class DemiScript
     setviewer(demifest, iiifjson, demijson)
     {
       var tilesources = [];
-      var overlays = [];
       var demi = this;
       var mjsequence = iiifjson.sequences[0];
       var i = 0;
+      var demithumb = [];
 
       var demi_frame = "<div id='demi_blackblock'></div>";
          demi_frame += "<div id='demi_lightbox'>";
@@ -104,54 +125,46 @@ class DemiScript
          demi_frame += "  <div class='demi_lightinner' id='demi_settings'><h2>Overlay Groups and Curation</h2></div>";
          demi_frame += "<div class='btnwinemid' id='demi_closelb'>X</div></div>";
       jQuery("body").append(demi_frame);
+      //jQuery("body").append("<div id='overlaycontainer' style='display: none;'></div>");
 
       mjsequence.canvases.forEach(canvas => {
 
         var mjimage = canvas.images[0].resource.service['@id'];
         var iiifmanifest = mjimage + "/info.json";
 
-        var manifestjson;
-        var makethumb = canvas.thumbnail['@id'];
+        var canvaswidth = canvas.width;
+        var canvasheight = canvas.height;
+        var thumbwidth = Math.round(canvaswidth / canvasheight * 250);
 
-        overlays.push({id: "whitesheet"+i,x: 0,y: 0,width: 2,height: 2,className: "bleach"});
+        var makethumb = canvas.images[0].resource['@id'].replace("full/full", "full/" + thumbwidth + ",250");
+        demi.overlays.push({px: 0,py: 0,width: canvas.images[0].resource.width, height: canvas.images[0].resource.height, className: "bleach"});
         i++;
 
-        var demithumb = "<div data-pageno=\"" + i + "\" class=\"indexthumbs\" onmouseover=\"jQuery(\'#pagethumb" + i + " img\').css(\'opacity\', \'1\');\" onmouseout=\"jQuery(\'#pagethumb" + i + " img\').css(\'opacity\', \'0.7\');\" id=\"pagethumb" + i + "\" style=\"cursor: pointer; width: 200px; margin: 3px auto; position: relative;\"><img style=\"width: 100%; opacity: 0.7;\" src=\"" + makethumb + "\" /><div style=\"bottom: 3px; right: 3px; font-weight: 800; font-size: 175%; position: absolute;   text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;\">" + i + "</div></div>";
-
-        jQuery("#demi_thumbs").append(demithumb);
+        demithumb.push({thumbid: "#pagethumb" + i, thumbnail: "<div data-pageno=\"" + i + "\" class=\"indexthumbs\" onmouseover=\"jQuery(\'#pagethumb" + i + " img\').css(\'opacity\', \'1\');\" onmouseout=\"jQuery(\'#pagethumb" + i + " img\').css(\'opacity\', \'0.7\');\" id=\"pagethumb" + i + "\" style=\"cursor: pointer; width: 200px; margin: 3px auto; position: relative;\"><img style=\"width: 100%; opacity: 0.7;\" src=\"" + makethumb + "\" /><div style=\"bottom: 3px; right: 3px; font-weight: 800; font-size: 175%; position: absolute;   text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff;\">" + i + "</div></div>"});
 
         tilesources.push(iiifmanifest);
-        jQuery("#overlaycontainer").append('<div id="whitesheet' + i + '" class="bleach"></div>');
+        //jQuery("#overlaycontainer").append('<div id="whitesheet' + i + '" class="bleach"></div>');
 
       });
 
-      jQuery(".indexthumbs").off("click");
-      jQuery(".indexthumbs").on("click", function (event) {
-              var pageno = jQuery(this).attr("data-pageno");
-              demi.setdocumentpage(pageno);
-              demi.collapser();
+      this.viewer = OpenSeadragon({
+    				id: this.canvas,
+    				allowZoomToConstraintsOnResize: true,
+    				showNavigator:  false,
+    				tileSources: tilesources,
+            sequenceMode: true,
+    				prefixUrl: demi.folderpath + "js/openseadragon/images/",
+    				maxZoomLevel: 30,
+    				minZoomLevel: 0.25,
+            showRotationControl: true,
+            overlays: [{id: "whitesheet",
+                        px: 0,
+                        py: 0,
+                        width: mjsequence.canvases[0].images[0].resource.width,
+                        height: mjsequence.canvases[0].images[0].resource.height,
+                        className: "bleach"}]
             });
 
-      this.viewer = OpenSeadragon({
-  				id: this.canvas,
-  				allowZoomToConstraintsOnResize: true,
-  				showNavigator:  false,
-  				tileSources: tilesources,
-          sequenceMode: true,
-  				prefixUrl: "../sites/demiscript/js/openseadragon/images/",
-  				maxZoomLevel: 30,
-  				minZoomLevel: 0.25,
-          showRotationControl: true
-          });
-
-          jQuery("#whiteoverlay").remove();
-          var elt = document.createElement("div");
-                  elt.id = "whiteoverlay";
-                  elt.className = "bleach";
-                  demi.viewer.addOverlay({
-                      element: elt,
-                      location: new OpenSeadragon.Rect(0, 0, 1, 1)
-                  });
 
           //canvas rotation handler
           demi.viewer.addHandler("rotate", function(obj)
@@ -169,7 +182,7 @@ class DemiScript
 
                             demi.viewer.viewport.setRotation(0);
 
-                            demi.pageoverlays[curpage] = demi.castcanvas.toJSON(['id','sAngle', 'lbr', 'space', 'comment', 'src', 'type']);
+                            demi.pageoverlays[curpage] = demi.castcanvas.toJSON(['id','sAngle', 'lbr', 'space', 'comment', 'src', 'type', "hasControls", "hasBorders", "lockMovementX", "lockMovementY", "lockScalingX", "lockScalingY", "lockRotation", "editable"]);
                             var cjkdefer = [];
 
                             jQuery("#pagethumb" + (curpage + 1)).removeClass("activepagethumb");
@@ -217,21 +230,29 @@ class DemiScript
                               demi.castcanvas.renderAll();
                             }
 
-                            jQuery("#whiteoverlay").remove();
-                            var elt = document.createElement("div");
-                                    elt.id = "whiteoverlay";
-                                    elt.className = "bleach";
-                                    demi.viewer.addOverlay({
-                                        element: elt,
-                                        location: new OpenSeadragon.Rect(0, 0, 1, 1)
-                                    });
+                          //var location = new OpenSeadragon.Point(0,0);
+                          //demi.viewer.addOverlay(demi.overlays[demi.page], location);
+                          demi.viewer.overlays[0].width = mjsequence.canvases[demi.page].images[0].resource.width;
+                          demi.viewer.overlays[0].height = mjsequence.canvases[demi.page].images[0].resource.height;
+
                           demi.demiCanvasSort();
                           });
+
+          demithumb.forEach(function(thumbnail){
+            jQuery("#demi_thumbs").append(thumbnail.thumbnail);
+            console.log(thumbnail.thumbid);
+            jQuery(thumbnail.thumbid).on("click", function (event) {
+                    var pageno = jQuery(this).attr("data-pageno");
+                    demi.setdocumentpage(pageno);
+                    demi.collapser();
+                  });
+          });
+          jQuery("#pagethumb1").addClass("activepagethumb");
 
           // Append Editor Overlay
           var demieditor = '<div class="savebar">';
 
-            demieditor += '<button class="btngreensingle" id="advanced" style="width: 50px; height: 50px;"><i class="material-icons md-24" style="">edit</i></button>';
+            if(demi.editor){demieditor += '<button class="btngreensingle" id="advanced" style="width: 50px; height: 50px;"><i class="material-icons md-24" style="">edit</i></button>';}
 
             demieditor += '<button class="btngreensingle" id="settings" style="width: 50px; height: 50px; margin-left: 2px;"><i class="material-icons md-24" style="">perm_media</i></button>';
 
@@ -239,18 +260,18 @@ class DemiScript
 
             demieditor += '<button class="btngreensingle" id="transcribedtext" style="width: 50px; height: 50px; margin-left: 2px;"><i class="material-icons md-24" style="">article</i></button>';
 
-            demieditor += '<button class="btngreensingle" id="demisave" style="width: 50px; height: 50px; margin-left: 2px;"><i class="material-icons md-24" style="">save</i></button>';
+            if(demi.editor){demieditor += '<button class="btngreensingle" id="demisave" style="width: 50px; height: 50px; margin-left: 2px;"><i class="material-icons md-24" style="">save</i></button>';}
 
             demieditor += '</div>';
 
             demieditor += '<div class="addlinebar">';
             //Group Objects Button
-            demieditor += '<button class="btngreensingle" id="groupobjects"><i class="material-icons md-18" style="transform: rotate(90deg);">select_all</i></button>';
+            //demieditor += '<button class="btngreensingle" id="groupobjects"><i class="material-icons md-18" style="transform: rotate(90deg);">select_all</i></button>';
             //Ungroup Objects Button
-            demieditor += '<button class="btngreensingle" id="ungroupobjects" style="margin-left: 2px;"><i class="material-icons md-18" style="">dashboard</i></button>';
+            //demieditor += '<button class="btngreensingle" id="ungroupobjects" style="margin-left: 2px;"><i class="material-icons md-18" style="">dashboard</i></button>';
 
             //Line Insert
-            demieditor += '<input type="text" title="Text Line" value="ニューライン" id="insertline1" onchange="" style="margin-left: 2px;"/><div style="display: inline-block;">';
+            if(demi.editor){demieditor += '<input type="text" title="Text Line" value="ニューライン" id="insertline1" onchange="" style="margin-left: 2px;"/><div style="display: inline-block;">';
             demieditor += '<button title="Insert Text, Horizontal" class="btngreenmid" id="addline" style=""><i class="material-icons md-18" style="">playlist_add</i></button>';
             demieditor += '<button title="Insert Text, Vertical" class="btngreenmid" id="addvertical" style=""><i class="material-icons md-18" style="transform: rotate(90deg);">playlist_add</i></button>';
             demieditor += '<button style="" id="cloneadd" title="Insert text, copy settings from active object." class="btngreenright"><i class="material-icons md-18" style="transform: rotate(90deg);">wrap_text</i></button></div>';
@@ -266,7 +287,8 @@ class DemiScript
             demieditor += '<button class="btngreensingle" type="button" id="mappin" style="margin-left: 2px;"><i class="material-icons md-18">location_on</i></button>';
 
             demieditor += '<input id="colorsethidden" value="rgba(0,0,0,1)" style="max-width: 100%; display: none;"/>';
-            demieditor += '</div>';
+            demieditor += '</div>';}
+            else {demieditor += '<input type="text" title="Text Line" value="ニューライン" id="insertline1" onchange="" style="display: none; margin-left: 2px;"/><div style="display: inline-block;">';}
 
           jQuery("#" + this.canvas).append(demieditor);
 
@@ -280,14 +302,14 @@ class DemiScript
                 });
 
           //Grouping and Ungrouping Buttons
-          jQuery("#groupobjects").on("click", function (event) {
-                  demi.demiCanvasSort();
-                  demi.initgrouping();
-                  });
-          jQuery("#ungroupobjects").on("click", function (event) {
-                  demi.ungroup();
-                  demi.demiCanvasSort();
-                  });
+            // jQuery("#groupobjects").on("click", function (event) {
+            //         demi.demiCanvasSort();
+            //         demi.initgrouping();
+            //         });
+            // jQuery("#ungroupobjects").on("click", function (event) {
+            //         demi.ungroup();
+            //         demi.demiCanvasSort();
+            //         });
 
           //Polygon Button
           jQuery("#polymake").on("click", function (event) {
@@ -404,8 +426,7 @@ class DemiScript
                                 if(object.type == "cjk-vertical" || object.type == "image")
                                   {
                                   cjkdefer.push(object);
-                                  console.log("deserialize");
-                                  console.log(object);
+
                                   demi.pageoverlays[p].objects[i] = null;
                                   }
                                 });
@@ -672,6 +693,7 @@ class DemiScript
       var demi = this;
 
       cjkdefer.forEach(function(object){
+
         if(object.type == "cjk-vertical")
         {
 
@@ -689,12 +711,12 @@ class DemiScript
                             });
 
         newline = gather[(gather.length - 1)];
-        var validkeys = ["text", "id", "textAlign", "fill", "textBackgroundColor", "lineHeight", "sAngle", "fontWeight", "opacity", "overlaysection", "stroke", "strokeWidth", "comment", "left", "top", "originX", "originY", "skewX", "skewY", "scaleX", "scaleY"];
+        var validkeys = ["text", "id", "textAlign", "fill", "textBackgroundColor", "lineHeight", "sAngle", "fontWeight", "opacity", "overlaysection", "stroke", "strokeWidth", "comment", "left", "top", "originX", "originY", "skewX", "skewY", "scaleX", "scaleY", "hasControls", "hasBorders", "lockMovementX", "lockMovementY", "lockScalingX", "lockScalingY", "lockRotation", "editable"];
 
         Object.entries(object).forEach(([key, value]) => {
           if(validkeys.indexOf(key) != -1)
           {
-            if (isNaN(value) !== true) value = Number.parseFloat(value);
+            if (isNaN(value) !== true && value !== true && value !== false) value = Number.parseFloat(value);
             newline.set(key, value);
           }
         });
@@ -724,12 +746,14 @@ class DemiScript
         newimg = gather[(gather.length - 1)];
         newimg.setSrc(object.src);
 
-        var validkeys = ["id", "sAngle", "opacity", "overlaysection", "stroke", "strokeWidth", "comment", "left", "top", "originX", "originY", "skewX", "skewY", "scaleX", "scaleY", "width", "height", "src"];
+        var validkeys = ["text", "id", "textAlign", "fill", "textBackgroundColor", "lineHeight", "sAngle", "fontWeight", "opacity", "overlaysection", "stroke", "strokeWidth", "comment", "left", "top", "originX", "originY", "skewX", "skewY", "scaleX", "scaleY", "hasControls", "hasBorders", "lockMovementX", "lockMovementY", "lockScalingX", "lockScalingY", "lockRotation", "editable"];
 
         Object.entries(object).forEach(([key, value]) => {
           if(validkeys.indexOf(key) != -1)
           {
-            if (isNaN(value) !== true) value = Number.parseFloat(value);
+            if (isNaN(value) !== true && value !== true && value !== false) value = Number.parseFloat(value);
+            if (value == "true") value = true;
+            if (value == "false") value = false;
             newimg.set(key, value);
           }
         });
@@ -784,33 +808,42 @@ class DemiScript
     {
       var demi = this;
       var i;
-
+      if(demi.editor){
       jQuery("#demi_settings").html("<h2>Overlay Groups and Curation</h2>");
+      }
+      else
+      {
+      jQuery("#demi_settings").html("<h2>Curation</h2>");
+      }
 
-      if (this.overlaygroups.length > 0)
+      if (this.overlaygroups.length > 0 && demi.editor == true)
       {
         jQuery("#demi_settings").append("<hr/><h3><b>Overlay Groups</b></h3>");
         jQuery("#demi_settings").append("<input id='overlaygroupadder' value='new overlay group' style='font-size: 20px;' /><button id='overlaygroupadderbtn' class='btngreenright' style='font-weight: bold; font-size: 22px; padding: 0; min-width: 20px;'>+</button><br/><br/>");
         i = 0;
         demi.overlaygroups.forEach((e) => {
-            jQuery("#demi_settings").append("<button style='margin-left: 2px; cursor: default; padding: 0; padding-left: 5px; padding-right: 5px;' class='btnlableleft'>" + e + "</button><button style='padding: 0; padding-left: 5px; padding-right: 5px;' class='btngreenright removeoverlaybtn' data-id='" + i + "'>🗑</button>");
+            var overlaybtn = "<button style='margin-left: 2px; cursor: default; padding: 0; padding-left: 5px; padding-right: 5px;' class='btnlableleft'>" + e + "</button>";
+            if(demi.editor){overlaybtn += "<button style='padding: 0; padding-left: 5px; padding-right: 5px;' class='btngreenright removeoverlaybtn' data-id='" + i + "'>🗑</button>";}
+            jQuery("#demi_settings").append(overlaybtn);
             i++;
         });
       }
       else
       {
-        jQuery("#demi_settings").append("<hr/><h3><b>Overlay Groups</b></h3>");
-        jQuery("#demi_settings").append("<input id='overlaygroupadder' value='new overlay group' style='font-size: 20px;' /><button id='overlaygroupadderbtn' class='btngreenright' style='font-weight: bold; font-size: 22px; padding: 0; min-width: 20px;'>+</button><br/><br/>");
+        if(demi.editor){jQuery("#demi_settings").append("<hr/><h3><b>Overlay Groups</b></h3>");
+        jQuery("#demi_settings").append("<input id='overlaygroupadder' value='new overlay group' style='font-size: 20px;' /><button id='overlaygroupadderbtn' class='btngreenright' style='font-weight: bold; font-size: 22px; padding: 0; min-width: 20px;'>+</button><br/><br/>");}
       }
 
       if (this.curationfolders.length > 0)
       {
         jQuery("#demi_settings").append("<hr/><h3><b>Curated Images</b></h3>");
-        jQuery("#demi_settings").append("<input id='curationfolderadder' value='new curation folder' style='font-size: 20px;' /><button id='curationfolderadderbtn' class='btngreenright' style='font-weight: bold; font-size: 22px; padding: 0; min-width: 20px;'>+</button><br/><br/>");
+        if(demi.editor){jQuery("#demi_settings").append("<input id='curationfolderadder' value='new curation folder' style='font-size: 20px;' /><button id='curationfolderadderbtn' class='btngreenright' style='font-weight: bold; font-size: 22px; padding: 0; min-width: 20px;'>+</button><br/><br/>");}
         i = 0;
         var collection = "";
         demi.curationfolders.forEach((e) => {
-            jQuery("#demi_settings").append("<div style='max-width: 150px; padding: 8px; float: left; text-align: center;' ><div class='curationfolder' data-id='" + i + "'>📁</div><br><span>" + e + "</span><button style='padding: 0; padding-left: 5px; padding-right: 5px; margin-left: 4px;' class='btngreensingle removefolderbtn' data-id='" + i + "'>🗑</button></div>");
+          var folderbtn = "<div style='max-width: 150px; padding: 8px; float: left; text-align: center;' ><div class='curationfolder' data-id='" + i + "'>📁</div><br><span>" + e + "</span>";
+          if(demi.editor){folderbtn += "<button style='padding: 0; padding-left: 5px; padding-right: 5px; margin-left: 4px;' class='btngreensingle removefolderbtn' data-id='" + i + "'>🗑</button>";}
+            jQuery("#demi_settings").append(folderbtn + "</div>");
             collection = "";
             if(demi.curationitems[i])
               {
@@ -818,7 +851,9 @@ class DemiScript
                 demi.curationitems[i].forEach((image) => {
                 collection += "<div style='float: left; width: 150px; height: 150px; margin-left: 2px; overflow: auto;'>";
                 collection += "<img src='" + image.src + "' style='cursor: pointer; border: 1px solid black; max-width: 150px; max-height: 120px;' onclick='window.open(\"" + image.src + "\", \"_blank\");'/><div style='clear: both;'></div>";
-                collection += "<input value='" + image.title + "' style='max-width: calc(100% - 40px);' class='imgtitleinput' data-id='" + k + "' data-parentid='" + i + "'/><button data-left='" + image.bounds.left + "' data-top='" + image.bounds.top + "' data-width='" + image.bounds.width + "' data-height='" + image.bounds.height + "' data-page='" + image.page + "'class='btngreensingle gotocurimg' style='padding: 0; max-height: 19px; max-width: 25px; margin-left: 2px;'>⬋</button>";
+                if(demi.editor){collection += "<input value='" + image.title + "' style='max-width: calc(100% - 70px);' class='imgtitleinput' data-id='" + k + "' data-parentid='" + i + "'/><button data-left='" + image.bounds.left + "' data-top='" + image.bounds.top + "' data-width='" + image.bounds.width + "' data-height='" + image.bounds.height + "' data-page='" + image.page + "'class='btngreensingle gotocurimg' style='padding: 0; max-height: 22px; max-width: 25px; margin-left: 2px;'>⬋</button>";
+                collection += "<button class='btngreensingle trashimg' data-id='" + k + "' data-parentid='" + i + "' style='padding: 0; max-height: 22px; max-width: 25px; margin-left: 2px;'>🗑</button>";}
+                else{collection += "<span style='max-width: calc(100% - 70px);' class='imgtitleinput' data-id='" + k + "' data-parentid='" + i + "'>" + image.title + "</span><button data-left='" + image.bounds.left + "' data-top='" + image.bounds.top + "' data-width='" + image.bounds.width + "' data-height='" + image.bounds.height + "' data-page='" + image.page + "'class='btngreensingle gotocurimg' style='padding: 0; max-height: 22px; max-width: 25px; margin-left: 2px;'>⬋</button>"}
                 collection += "</div>";
                 k++;
                 });
@@ -830,8 +865,8 @@ class DemiScript
       }
       else
       {
-        jQuery("#demi_settings").append("<hr/><h3><b>Curated Images</b></h3>");
-        jQuery("#demi_settings").append("<input id='curationfolderadder' value='new curation folder' style='font-size: 20px;' /><button id='curationfolderadderbtn' class='btngreenright' style='font-weight: bold; font-size: 22px; padding: 0; min-width: 20px;'>+</button><br/><br/>");
+        if(demi.editor){jQuery("#demi_settings").append("<hr/><h3><b>Curated Images</b></h3>");
+        jQuery("#demi_settings").append("<input id='curationfolderadder' value='new curation folder' style='font-size: 20px;' /><button id='curationfolderadderbtn' class='btngreenright' style='font-weight: bold; font-size: 22px; padding: 0; min-width: 20px;'>+</button><br/><br/>");}
       }
 
       jQuery("#overlaygroupadderbtn").off("click");
@@ -925,7 +960,7 @@ class DemiScript
                                                                 var folder = jQuery( this ).attr("data-id");
                                                                 jQuery( this ).toggleClass("folderactive");
                                                                 jQuery("#folder" + folder).toggle("slow");
-                                                                console.log(demi.curationitems);
+
                                                               });
 
       jQuery("#imgtitleinput").off("change");
@@ -936,7 +971,7 @@ class DemiScript
                                                               demi.curationitems[folderid][imgid].title = title;
                                                               });
 
-      jQuery("#gotocurimg").off("click");
+      jQuery(".gotocurimg").off("click");
       var gotocuratedimage = jQuery(".gotocurimg").on("click", function(event){
                                                                var boundsleft = jQuery( this ).attr("data-left");
                                                                var boundstop = jQuery( this ).attr("data-top");
@@ -946,15 +981,40 @@ class DemiScript
                                                                demi.gotoelement("rect", [boundsleft, boundstop, boundswidth, boundsheight, page]);
                                                                demi.collapser();
                                                                });
+      jQuery(".trashimg").off("click");
+      var gotocuratedimage = jQuery(".trashimg").on("click", function(event){
+                                                               var imgid = jQuery( this ).attr("data-id");
+                                                               var folderid = jQuery( this ).attr("data-parentid");
+                                                               jQuery("body").append("<div title='Are you sure?' id='confirmdeny'></div>");
+                                                               jQuery("#confirmdeny").dialog({
+                                                                           dialogClass: "no-close",
+                                                                           buttons : {
+                                                                           "Delete" : function() {
+                                                                             demi.curationitems[folderid][imgid] = null;
+                                                                             demi.curationitems[folderid] = demi.curationitems[folderid].filter(item => item !== null);
+                                                                             demi.getGroupings();
+                                                                           jQuery(this).dialog("close");
+
+                                                                           },
+                                                                           "Cancel" : function() {
+                                                                           jQuery(this).dialog("close");
+
+                                                                           }
+                                                                           },
+                                                                           close: function() {jQuery("#confirmdeny").remove();}
+                                                                           });
+                                                               });
     }
 
     //Create workable Plain Text from text and itext elements
 
     createplaintext()
     {
+    var demi = this;
 
-    var demi_showarticle_header = "<h2>Plain Transcription</h2>";
-       demi_showarticle_header +=  "<div>";
+    var demi_showarticle_header = "<h2 style='display: inline-block;'>Plain Transcription</h2>";
+       demi_showarticle_header +=  "<button class='btngreensingle' id='exportplaintext' style='display: inline-block; padding: 5px; font-weight: bold; font-size: 14pt;'><i class='material-icons md-18' >download</i></button>";
+       if(demi.editor){demi_showarticle_header +=  "<div>";
        demi_showarticle_header +=  "<button class='btngreensingle' id='plaintext_id_down' style='padding-top: 0px; font-weight: bold; font-size: 14pt;'>←</button>";
        demi_showarticle_header +=  "<button class='btngreensingle' id='plaintext_id_up' style='padding-top: 0px; font-weight: bold; font-size: 14pt;'>→</button>";
        demi_showarticle_header +=  "<span style='width: 10px;'> </span>";
@@ -963,12 +1023,13 @@ class DemiScript
        demi_showarticle_header +=  "<span style='width: 10px;'> </span>";
        demi_showarticle_header +=  "<button class='btngreenleft unticked' id='togglespace' style='padding-top: 0px; font-weight: bold; font-size: 14pt;'><span class='unticked'>☐</span><span class='ticked'>✔</span></button>";
        demi_showarticle_header +=  "<button class='btnlableright' id='togglespace_icon' style='padding-top: 0px; font-weight: bold; font-size: 14pt;'>␣</button>";
-       demi_showarticle_header +=  "</div>";
+       demi_showarticle_header +=  "</div>";}
 
     jQuery("#demi_showarticle").html(demi_showarticle_header);
 
     this.sortedobjects = [];
     var demi = this;
+    var fullplain = "";
 
     this.castcanvas.forEachObject(function(obj) {
                   if (obj.hasOwnProperty("text"))
@@ -987,14 +1048,16 @@ class DemiScript
                     if(e.lbr === true)
                     {
                       jQuery("#demi_showarticle").append("<br/>");
+                      fullplain += "\n";
                     }
-
-                    jQuery("#demi_showarticle").append("<span class='plaintextobject' id='" + e.id + "'>" + e.text + "</span>");
-
                     if(e.space === true)
                     {
                       jQuery("#demi_showarticle").append("<span> </span>");
+                      fullplain += " ";
                     }
+
+                    jQuery("#demi_showarticle").append("<span class='plaintextobject' id='" + e.id + "'>" + e.text + "</span>");
+                    fullplain += e.text;
                   }
 
                 });
@@ -1097,7 +1160,7 @@ class DemiScript
                                 demi.sortedobjects.forEach((obj) => {
                                                       if(obj.id == jQuery("span.plaintextobject.active").attr("id"))
                                                       {
-                                                        if (obj.spacer === true)
+                                                        if (obj.space === true)
                                                         {
                                                           jQuery("#togglespace").removeClass("ticked");
                                                           jQuery("#togglespace").addClass("unticked");
@@ -1114,6 +1177,24 @@ class DemiScript
                                         demi.createplaintext();
                                         });
 
+                  jQuery("#exportplaintext").off("click");
+                  var togglespace = jQuery("#exportplaintext").on("click", function (event) {
+                                              var file = new Blob([fullplain], {type: 'application/txt'});
+
+                                                    var a = document.createElement("a")
+                                                    var url = URL.createObjectURL(file);
+                                                    a.href = url;
+                                                    a.download = "page_" + demi.page + "_plaintext.txt";
+                                                    document.body.appendChild(a);
+                                                    a.click();
+                                                    setTimeout(() => {
+                                                        document.body.removeChild(a);
+                                                        window.URL.revokeObjectURL(url);
+                                                    }, 0);
+
+                                        });
+
+
     }
 
     //Change to different page on IIIF-Document and load corresponding overlay.
@@ -1125,7 +1206,7 @@ class DemiScript
     }
 
     //Insert a Text Line
-    addline(direction = "horizontal", linesource="#insertline1", setleft=0, settop=0, originX = "left", originY = "top", fontsize=120, textBackgroundColor = "rgba(0,0,0,0)", lbr = true, space = false, scaleX = 1, scaleY = 1, overlaysection = "main")
+    addline(direction = "horizontal", linesource="#insertline1", setleft=0, settop=0, originX = "left", originY = "top", fontsize=120, textBackgroundColor = "rgba(0,0,0,0)", lbr = false, space = false, scaleX = 1, scaleY = 1, overlaysection = "main")
     {
         this.viewer.viewport.setRotation(0);
         var toadd = jQuery(linesource).val();
@@ -1228,7 +1309,7 @@ class DemiScript
           //var zoom = Math.sqrt((Math.round(parseFloat(page.width)) / Math.round(parseFloat(data[2])) + Math.round(parseFloat(page.height)) / Math.round(parseFloat(data[3]))) / 2);
           var factorizer = Math.min(((Math.round(parseFloat(page.width)) / (Math.round(parseFloat(demi.viewer.viewport.getContainerSize().x)))) / (page.width / 5000)), ((Math.round(parseFloat(page.height)) / Math.round(parseFloat(demi.viewer.viewport.getContainerSize().y)) ) / (page.height / 5000)) );
           var zoom = (Math.min((Math.round(parseFloat(demi.viewer.viewport.getContainerSize().x)) / Math.round(parseFloat(data[2]))), (Math.round(parseFloat(demi.viewer.viewport.getContainerSize().y)) / Math.round(parseFloat(data[3]))))) * factorizer;
-          console.log(demi.viewer.viewport.getContainerSize());
+
           var coords = new OpenSeadragon.Point(sety, setx);
 
                 				coords.x = coords.x * (page.width / 5000);
@@ -1238,115 +1319,115 @@ class DemiScript
                 					demi.castcanvas.renderAll();
                         });
         }
-        demi.viewer.goToPage(data[4]);
+        demi.setdocumentpage((data[4] + 1));
     }
 
     //Initiate Object Grouping Mode
-    initgrouping()
-    {
-      this.viewer.viewport.setRotation(0);
-      var rect, isDownRect, origX, origY;
-      var completerect = false;
-      var demi = this;
-
-				demi.viewer.zoomPerClick = 1;
-
-        var recthandler = function(o)
-          {
-            if (!completerect)
-            {
-              isDownRect = true;
-
-                var pointer = demi.castcanvas.getPointer(o.e);
-                origX = pointer.x;
-                origY = pointer.y;
-                rect = new fabric.Rect({
-                  left: origX,
-                  top: origY,
-                  originX: "left",
-                  originY: "top",
-                  width: pointer.x-origX,
-                  height: pointer.y-origY,
-                  angle: 0,
-                  sAngle: 0,
-                  fill: "rgba(0,150,255,0.4)",
-                  strokeWidth: 1,
-  								stroke: "rgba(0,0,0,0.7)",
-                  transparentCorners: false,
-                  id: demi.assignnewid(),
-                  pairing:"",
-                  break:"",
-                  tei:"",
-                  teisub:"",
-                  furigana:"",
-                  display:"",
-                  comment:"",
-                  section:"",
-                  de_de:"",
-                  en:"",
-                  overlaysection:""
-                });
-                completerect = true;
-
-                demi.castcanvas.add(rect);
-
-            }
-            else
-            {
-                var newgroup = [];
-                rect.setCoords();
-                demi.castcanvas.forEachObject(function(obj) {
-                              if (obj === rect) return;
-                              if(rect.intersectsWithObject(obj))
-                              {
-                                newgroup.push(obj);
-                              }
-                            });
-
-                  if (newgroup.length > 0)
-                  {
-                    demi.castcanvas.discardActiveObject();
-                      var sel = new fabric.ActiveSelection(newgroup, {
-                        canvas:   demi.castcanvas,
-                          });
-                    demi.castcanvas.setActiveObject(sel);
-                    demi.castcanvas.getActiveObject().toGroup();
-                  }
-
-                demi.castcanvas.remove(rect);
-                completerect = false;
-                isDownRect = false;
-                demi.castcanvas.off("mouse:down", recthandler);
-                demi.castcanvas.off("mouse:down", rectsizer);
-                demi.viewer.zoomPerClick = 2;
-
-            }
-          };
-
-          demi.castcanvas.on("mouse:down", recthandler);
-
-          var rectsizer = function(o)
-          {
-            if (!isDownRect) return;
-
-            var pointer = demi.castcanvas.getPointer(o.e);
-
-            if(origX>pointer.x){
-              rect.set({ left: pointer.x });
-            }
-            if(origY>pointer.y){
-              rect.set({ top: pointer.y });
-            }
-
-            rect.set({ width: Math.abs(origX - pointer.x) });
-            rect.set({ height: Math.abs(origY - pointer.y) });
-
-            demi.castcanvas.renderAll();
-          };
-
-          demi.castcanvas.on("mouse:move", rectsizer);
-
-    }
+          // initgrouping()
+          // {
+          //   this.viewer.viewport.setRotation(0);
+          //   var rect, isDownRect, origX, origY;
+          //   var completerect = false;
+          //   var demi = this;
+          //
+      		// 		demi.viewer.zoomPerClick = 1;
+          //
+          //     var recthandler = function(o)
+          //       {
+          //         if (!completerect)
+          //         {
+          //           isDownRect = true;
+          //
+          //             var pointer = demi.castcanvas.getPointer(o.e);
+          //             origX = pointer.x;
+          //             origY = pointer.y;
+          //             rect = new fabric.Rect({
+          //               left: origX,
+          //               top: origY,
+          //               originX: "left",
+          //               originY: "top",
+          //               width: pointer.x-origX,
+          //               height: pointer.y-origY,
+          //               angle: 0,
+          //               sAngle: 0,
+          //               fill: "rgba(0,150,255,0.4)",
+          //               strokeWidth: 1,
+        	// 							stroke: "rgba(0,0,0,0.7)",
+          //               transparentCorners: false,
+          //               id: demi.assignnewid(),
+          //               pairing:"",
+          //               break:"",
+          //               tei:"",
+          //               teisub:"",
+          //               furigana:"",
+          //               display:"",
+          //               comment:"",
+          //               section:"",
+          //               de_de:"",
+          //               en:"",
+          //               overlaysection:""
+          //             });
+          //             completerect = true;
+          //
+          //             demi.castcanvas.add(rect);
+          //
+          //         }
+          //         else
+          //         {
+          //             var newgroup = [];
+          //             rect.setCoords();
+          //             demi.castcanvas.forEachObject(function(obj) {
+          //                           if (obj === rect) return;
+          //                           if(rect.intersectsWithObject(obj))
+          //                           {
+          //                             newgroup.push(obj);
+          //                           }
+          //                         });
+          //
+          //               if (newgroup.length > 0)
+          //               {
+          //                 demi.castcanvas.discardActiveObject();
+          //                   var sel = new fabric.ActiveSelection(newgroup, {
+          //                     canvas:   demi.castcanvas,
+          //                       });
+          //                 demi.castcanvas.setActiveObject(sel);
+          //                 demi.castcanvas.getActiveObject().toGroup();
+          //               }
+          //
+          //             demi.castcanvas.remove(rect);
+          //             completerect = false;
+          //             isDownRect = false;
+          //             demi.castcanvas.off("mouse:down", recthandler);
+          //             demi.castcanvas.off("mouse:down", rectsizer);
+          //             demi.viewer.zoomPerClick = 2;
+          //
+          //         }
+          //       };
+          //
+          //       demi.castcanvas.on("mouse:down", recthandler);
+          //
+          //       var rectsizer = function(o)
+          //       {
+          //         if (!isDownRect) return;
+          //
+          //         var pointer = demi.castcanvas.getPointer(o.e);
+          //
+          //         if(origX>pointer.x){
+          //           rect.set({ left: pointer.x });
+          //         }
+          //         if(origY>pointer.y){
+          //           rect.set({ top: pointer.y });
+          //         }
+          //
+          //         rect.set({ width: Math.abs(origX - pointer.x) });
+          //         rect.set({ height: Math.abs(origY - pointer.y) });
+          //
+          //         demi.castcanvas.renderAll();
+          //       };
+          //
+          //       demi.castcanvas.on("mouse:move", rectsizer);
+          //
+          // }
 
     //create Rectangle
     rectangle()
@@ -1557,9 +1638,10 @@ class DemiScript
                 var iiifdata = demi.iiifmanifest.sequences[0].canvases[demi.page];
 
                 var sectioncoords = Math.round(rect.get("left") *(iiifdata.width / 5000)) + "," + Math.round(rect.get("top") *(iiifdata.width / 5000)) + "," + Math.round(rect.get("width") *(iiifdata.width / 5000) * rect.get("scaleX")) + "," + Math.round(rect.get("height") *(iiifdata.width / 5000) * rect.get("scaleY"));
+                var pagedimensions = demi.iiifmanifest.sequences[0].canvases[demi.page].width + "," + demi.iiifmanifest.sequences[0].canvases[demi.page].height;
 
-            		var cursrc = demi.iiifmanifest.sequences[0].canvases[demi.page].images[0].resource.service['@id'] + "/" + sectioncoords + "/full/0/default.jpg";
-                console.log(cursrc);
+            		var cursrc = demi.iiifmanifest.sequences[0].canvases[demi.page].images[0].resource.service['@id'] + "/" + sectioncoords + "/" + pagedimensions + "/0/default.jpg";
+
 
                   jQuery("body").append("<div title='Curate to Folder' id='confirmdeny'></div>");
                   jQuery("#confirmdeny").append("<input id='setcurationtitle' value='Enter image title' /><br><span>Click to select folders:</span><br><div id='curationfolders'></div>");
@@ -1694,8 +1776,9 @@ class DemiScript
                       var iiifdata = demi.iiifmanifest.sequences[0].canvases[demi.page];
 
                       var sectioncoords = Math.round(rect.get("left") *(iiifdata.width / 5000)) + "," + Math.round(rect.get("top") *(iiifdata.width / 5000)) + "," + Math.round(rect.get("width") *(iiifdata.width / 5000) * rect.get("scaleX")) + "," + Math.round(rect.get("height") *(iiifdata.width / 5000) * rect.get("scaleY"));
+                      var pagedimensions = demi.iiifmanifest.sequences[0].canvases[demi.page].width + "," + demi.iiifmanifest.sequences[0].canvases[demi.page].height;
 
-                  		var cursrc = demi.iiifmanifest.sequences[0].canvases[demi.page].images[0].resource.service['@id'] + "/" + sectioncoords + "/full/0/default.jpg";
+                  		var cursrc = demi.iiifmanifest.sequences[0].canvases[demi.page].images[0].resource.service['@id'] + "/" + sectioncoords + "/" + pagedimensions + "/0/default.jpg";
 
                       demi.castcanvas.remove(rect);
                       completerect = false;
@@ -1774,44 +1857,27 @@ class DemiScript
             overlaysection:""});
           demi.castcanvas.add(oImg);
 
-          console.log(oImg);
+
 
           demi.addline("horizontal", "#insertline1", oImg.get("left")+oImg.get("width"), oImg.get("top")-oImg.get("height")+24, "left", "bottom", 24, "rgba(255,255,255,0.7)", true, false, 1, 1, "pins");
 
-          // var newgroup = [];
-          // var gather = [];
-          //
-          // demi.castcanvas.forEachObject(function(obj)
-          //                     {
-          //                       gather.push(obj);
-          //                     });
-          //
-          // newgroup.push(gather[(gather.length - 1)]);
-          // newgroup.push(gather[(gather.length - 2)]);
-          //
-          //     demi.castcanvas.discardActiveObject();
-          //       var sel = new fabric.ActiveSelection(newgroup, {
-          //         canvas:   demi.castcanvas,
-          //           });
-          //     demi.castcanvas.setActiveObject(sel);
-          //     demi.castcanvas.getActiveObject().toGroup();
         });
       }
 
     }
 
     //Ungroup active selection
-    ungroup()
-    {
-      if (!this.castcanvas.getActiveObject()) {
-      return;
-      }
-      if (this.castcanvas.getActiveObject().type !== 'group') {
-        return;
-      }
-      this.castcanvas.getActiveObject().toActiveSelection();
-      this.castcanvas.requestRenderAll();
-    }
+    // ungroup()
+    //     {
+    //       if (!this.castcanvas.getActiveObject()) {
+    //       return;
+    //       }
+    //       if (this.castcanvas.getActiveObject().type !== 'group') {
+    //         return;
+    //       }
+    //       this.castcanvas.getActiveObject().toActiveSelection();
+    //       this.castcanvas.requestRenderAll();
+    //     }
 
     //Assign a new object id, following the newest one
     assignnewid()
@@ -1956,7 +2022,7 @@ class DemiScript
     exportdemi()
     {
       this.viewer.viewport.setRotation(0);
-      this.pageoverlays[this.page] = this.castcanvas.toJSON(['id','sAngle', 'lbr', 'space', 'comment', 'src', 'type']);
+      this.pageoverlays[this.page] = this.castcanvas.toJSON(['id','sAngle', 'lbr', 'space', 'comment', 'src', 'type', "hasControls", "hasBorders", "lockMovementX", "lockMovementY", "lockScalingX", "lockScalingY", "lockRotation", "editable"]);
 
       var demi = this;
 
@@ -2020,9 +2086,9 @@ class DemiScript
 
         demi.castcanvas.renderAll();
 
-        exp[index] = demi.castcanvas.toJSON(['id','sAngle', 'lbr', 'space', 'comment', 'src', 'type']);
+        exp[index] = demi.castcanvas.toJSON(['id','sAngle', 'lbr', 'space', 'comment', 'src', 'type', "hasControls", "hasBorders", "lockMovementX", "lockMovementY", "lockScalingX", "lockScalingY", "lockRotation", "editable"]);
 
-        console.log(exp[index]);
+
 
         demi.castcanvas.clear();
 

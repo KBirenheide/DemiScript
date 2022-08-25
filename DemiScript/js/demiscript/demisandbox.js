@@ -1,5 +1,5 @@
 jQuery( document ).ready(function() {
-var demiviewer = new DemiScript("demiscriptviewer");
+var demiviewer = new DemiScript("demiscriptviewer", "../sites/demiscript/");
 
 jQuery("#tilesourcebtn").on("click", function (event) {
   demiviewer.constructviewer(false, jQuery("#tilesourcer").val());
