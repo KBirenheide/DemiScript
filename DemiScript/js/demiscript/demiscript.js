@@ -240,7 +240,7 @@ class DemiScript
 
           demithumb.forEach(function(thumbnail){
             jQuery("#demi_thumbs").append(thumbnail.thumbnail);
-            console.log(thumbnail.thumbid);
+
             jQuery(thumbnail.thumbid).on("click", function (event) {
                     var pageno = jQuery(this).attr("data-pageno");
                     demi.setdocumentpage(pageno);
@@ -1299,12 +1299,14 @@ class DemiScript
     gotoelement(method, data)
     {
       var demi = this;
+
         if(method == "rect")
         {
           var goto = demi.viewer.addOnceHandler("open", function(){
           var page = demi.iiifmanifest.sequences[0].canvases[(data[4])];
           var setx = Math.round((parseFloat(data[1]) + parseFloat((0.5 * data[3])))*1000)/1000;
           var sety = Math.round((parseFloat(data[0]) + parseFloat((0.5 * data[2])))*1000)/1000;
+
 
           //var zoom = Math.sqrt((Math.round(parseFloat(page.width)) / Math.round(parseFloat(data[2])) + Math.round(parseFloat(page.height)) / Math.round(parseFloat(data[3]))) / 2);
           var factorizer = Math.min(((Math.round(parseFloat(page.width)) / (Math.round(parseFloat(demi.viewer.viewport.getContainerSize().x)))) / (page.width / 5000)), ((Math.round(parseFloat(page.height)) / Math.round(parseFloat(demi.viewer.viewport.getContainerSize().y)) ) / (page.height / 5000)) );
@@ -1319,7 +1321,7 @@ class DemiScript
                 					demi.castcanvas.renderAll();
                         });
         }
-        demi.setdocumentpage((data[4] + 1));
+        demi.setdocumentpage((parseInt(data[4]) + parseInt(1)));
     }
 
     //Initiate Object Grouping Mode
@@ -1811,7 +1813,7 @@ class DemiScript
                       demi.viewer.zoomPerClick = 2;
 
                       jQuery("body").append("<div id='loader'></div>");
-                      
+
                       function imageExists(url) {return new Promise(resolve => {
                             var img = new Image();
                             img.addEventListener('load', () => resolve(true));
