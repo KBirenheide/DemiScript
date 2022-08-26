@@ -1642,40 +1642,63 @@ class DemiScript
 
             		var cursrc = demi.iiifmanifest.sequences[0].canvases[demi.page].images[0].resource.service['@id'] + "/" + sectioncoords + "/" + pagedimensions + "/0/default.jpg";
 
+                jQuery("body").append("<div id='loader'></div>");
 
-                  jQuery("body").append("<div title='Curate to Folder' id='confirmdeny'></div>");
-                  jQuery("#confirmdeny").append("<input id='setcurationtitle' value='Enter image title' /><br><span>Click to select folders:</span><br><div id='curationfolders'></div>");
-                  var i = 0;
-                  demi.curationfolders.forEach((e) => {
-                      jQuery("#curationfolders").append("<div style='max-width: 150px; padding: 8px; float: left; text-align: center;' ><div class='curationfolder' data-id='" + i + "'>📁</div><br><span>" + e + "</span></div>");
-                      i++;
-                  });
-                jQuery(".curationfolder").off("click");
-                jQuery(".curationfolder").on("click", function(event){
-                                                                      jQuery( this ).toggleClass("folderactive");
-                                                                      });
+                function imageExists(url) {return new Promise(resolve => {
+                      var img = new Image();
+                      img.addEventListener('load', () => resolve(true));
+                      img.addEventListener('error', () => resolve(false));
+                      img.src = url;
+                    })}
 
-                jQuery("#confirmdeny").dialog({
-                            dialogClass: "no-close",
-                            buttons : {
-                              "Add to folder(s)" : function() {
-                              var title = jQuery("#setcurationtitle").val();
-                              jQuery(".curationfolder.folderactive").each(function(index, element){
-                                                      if(!demi.curationitems[jQuery( element ).attr("data-id")])
-                                                      {
-                                                        demi.curationitems[jQuery( element ).attr("data-id")] = [];
-                                                      }
-                                                    demi.curationitems[jQuery( element ).attr("data-id")].push({src: cursrc,title: title,page: parseInt(demi.page), bounds: {left: rect.left, top: rect.top, width: rect.width, height: rect.height}});
+                    imageExists(cursrc).then(ok => {
+                      if(ok === false)
+                      {
+                        cursrc = demi.iiifmanifest.sequences[0].canvases[demi.page].images[0].resource.service['@id'] + "/" + sectioncoords + "/full/0/default.jpg";
+                        executecuration();
+                      }
+                      else{executecuration();}
+                      } );
 
-                                                    });
-                              jQuery(this).dialog("close");
-                              },
-                              "Cancel" : function() {
-                              jQuery(this).dialog("close");
-                              }
-                            },
-                            close: function() {jQuery("#confirmdeny").remove();}
-                            });
+                 function executecuration(){
+                   jQuery("#loader").remove();
+                   jQuery("body").append("<div title='Curate to Folder' id='confirmdeny'></div>");
+                   jQuery("#confirmdeny").append("<input id='setcurationtitle' value='Enter image title' /><br><span>Click to select folders:</span><br><div id='curationfolders'></div>");
+                   var i = 0;
+                   demi.curationfolders.forEach((e) => {
+                       jQuery("#curationfolders").append("<div style='max-width: 150px; padding: 8px; float: left; text-align: center;' ><div class='curationfolder' data-id='" + i + "'>📁</div><br><span>" + e + "</span></div>");
+                       i++;
+                   });
+                 jQuery(".curationfolder").off("click");
+                 jQuery(".curationfolder").on("click", function(event){
+                                                                       jQuery( this ).toggleClass("folderactive");
+                                                                       });
+
+                 jQuery("#confirmdeny").dialog({
+                             dialogClass: "no-close",
+                             buttons : {
+                               "Add to folder(s)" : function() {
+                               var title = jQuery("#setcurationtitle").val();
+                               jQuery(".curationfolder.folderactive").each(function(index, element){
+                                                       if(!demi.curationitems[jQuery( element ).attr("data-id")])
+                                                       {
+                                                         demi.curationitems[jQuery( element ).attr("data-id")] = [];
+                                                       }
+                                                     demi.curationitems[jQuery( element ).attr("data-id")].push({src: cursrc,title: title,page: parseInt(demi.page), bounds: {left: rect.left, top: rect.top, width: rect.width, height: rect.height}});
+
+                                                     });
+                               jQuery(this).dialog("close");
+                               },
+                               "Cancel" : function() {
+                               jQuery(this).dialog("close");
+                               }
+                             },
+                             close: function() {jQuery("#confirmdeny").remove();}
+                             });
+
+                  }
+
+
 
                 }
                 else
@@ -1787,6 +1810,26 @@ class DemiScript
                       demi.castcanvas.off("mouse:down", rectsizer);
                       demi.viewer.zoomPerClick = 2;
 
+                      jQuery("body").append("<div id='loader'></div>");
+                      
+                      function imageExists(url) {return new Promise(resolve => {
+                            var img = new Image();
+                            img.addEventListener('load', () => resolve(true));
+                            img.addEventListener('error', () => resolve(false));
+                            img.src = url;
+                          })}
+
+                          imageExists(cursrc).then(ok => {
+                            if(ok === false)
+                            {
+                              cursrc = demi.iiifmanifest.sequences[0].canvases[demi.page].images[0].resource.service['@id'] + "/" + sectioncoords + "/full/0/default.jpg";
+                              executecuration();
+                            }
+                            else{executecuration();}
+                            } );
+
+                       function executecuration(){
+                      jQuery("#loader").remove();
                       jQuery("body").append("<div title='Image Segment' id='confirmdeny'><a target='_blank' href='" + cursrc + "'>" + cursrc + "</a></div>");
 
                       jQuery("#confirmdeny").dialog({
@@ -1801,7 +1844,7 @@ class DemiScript
                                 });
 
 
-
+                        }
                   }
                 };
 
