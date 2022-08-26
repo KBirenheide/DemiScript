@@ -1256,3 +1256,20 @@ float: left;
 {
 	border: 2px solid rgb(0,175,0);
 }
+
+#loader
+{
+	position: fixed;
+	width: 10vw;
+	height: 10vh;
+	top: calc(50% - 5vh);
+	left: calc(50% - 5vw);
+	background-color: white;
+	background-image: url("icons/loader.gif");
+	background-position: center center;
+	background-repeat: no-repeat;
+	background-size: contain;
+	border-radius: 5px;
+	box-shadow: 5px 5px rgba(0,0,0,0.4);
+	border: 1px solid black;
+}
