@@ -11,33 +11,33 @@ The following arguments can be passed on initialization: canvas (string), folder
   If set to true, editor elements will be shown after loading a document. If set to false, only navigation elements are displayed.
 * ##### tilesources
   This memeber stores the IIIF manifest link.
-* iiifmanifest
+* ##### iiifmanifest
   This member stores the IIIF manifest after constructviewer() has been called.
-* viewer
+* ##### viewer
   This member stores the OpenSeadragon viewer after constructviewer() has been called.
-* overlay
+* ##### overlay
   This member stores the fabric.js overlay after constructviewer() has been called.
-* castcanvas
+* ##### castcanvas
   This member stores the fabric.js canvas after constructviewer() has been called.
-* pageoverlays
+* ##### pageoverlays
   This member stores the fabric overlays for each individual page of the document after constructviewer() has been called.
-* page
+* ##### page
   This member stores the active document page.
-* sortedobjects
+* ##### sortedobjects
   An empty array for internal processes.
-* advancededitor
+* ##### advancededitor
   A switch to check if the advanced editing buttons are currently displayed.
-* overlaygroups
+* ##### overlaygroups
   An array of overlay groups for elements. All text elements in the "main" group are also rendered in the plaintext view.
-* curationfolders
+* ##### curationfolders
   An array of all curation folders.
-* curationitems
+* ##### curationitems
   An array containing a set of arrays with the images associated with existing curation folders.
-* folderpath
+* ##### folderpath
   The path to the DemiScript installation.
-* overlays
+* ##### overlays
   This is a legacy member, which used to store OpenSeadragon overlays.  
-* additionalCanvasListeners
+* ##### additionalCanvasListeners
   An array of listeners pushed in via the appendCanvasListener() function.
   
 Additional members are related to internal processes, specifically the drawing of fabric shape elements and the rotation of the viewport and fabric elements.
