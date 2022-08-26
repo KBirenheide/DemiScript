@@ -5,7 +5,7 @@ The DemiScript library has the following core class:
 # DemiScript
 The following arguments can be passed on initialization: canvas (string), folderpath (string), editor(bool)
 ## Members
-* canvas
+* ### canvas
   contains the canvas element id. This is the element into which the viewer is rendered.
 * editor
   If set to true, editor elements will be shown after loading a document. If set to false, only navigation elements are displayed.
