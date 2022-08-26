@@ -1,8 +1,11 @@
 # DemiScript Documentation
 
-The DemiScript library has the following core class:
+The DemiScript core class can be initialized with
+```js
+new DemiScript();
+```
 
-# DemiScript
+# The DemiScript Class
 The following arguments can be passed on initialization: canvas (string), folderpath (string), editor(bool)
 ## Members
 * ##### canvas
