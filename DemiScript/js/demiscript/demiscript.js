@@ -849,12 +849,12 @@ class DemiScript
               {
                 var k = 0;
                 demi.curationitems[i].forEach((image) => {
-                collection += "<div style='float: left; width: 150px; height: 150px; margin-left: 2px; overflow: auto;'>";
+                collection += "<div style='float: left; width: 150px; height: 150px; margin-left: 2px; overflow: auto; position: relative;'><div style='max-width: 100%; position: absolute; bottom: 0; text-align: center;'>";
                 collection += "<img src='" + image.src + "' style='cursor: pointer; border: 1px solid black; max-width: 150px; max-height: 120px;' onclick='window.open(\"" + image.src + "\", \"_blank\");'/><div style='clear: both;'></div>";
                 if(demi.editor){collection += "<input value='" + image.title + "' style='max-width: calc(100% - 70px);' class='imgtitleinput' data-id='" + k + "' data-parentid='" + i + "'/><button data-left='" + image.bounds.left + "' data-top='" + image.bounds.top + "' data-width='" + image.bounds.width + "' data-height='" + image.bounds.height + "' data-page='" + image.page + "'class='btngreensingle gotocurimg' style='padding: 0; max-height: 22px; max-width: 25px; margin-left: 2px;'>⬋</button>";
                 collection += "<button class='btngreensingle trashimg' data-id='" + k + "' data-parentid='" + i + "' style='padding: 0; max-height: 22px; max-width: 25px; margin-left: 2px;'>🗑</button>";}
                 else{collection += "<span style='max-width: calc(100% - 70px);' class='imgtitleinput' data-id='" + k + "' data-parentid='" + i + "'>" + image.title + "</span><button data-left='" + image.bounds.left + "' data-top='" + image.bounds.top + "' data-width='" + image.bounds.width + "' data-height='" + image.bounds.height + "' data-page='" + image.page + "'class='btngreensingle gotocurimg' style='padding: 0; max-height: 22px; max-width: 25px; margin-left: 2px;'>⬋</button>"}
-                collection += "</div>";
+                collection += "</div></div>";
                 k++;
                 });
               }
