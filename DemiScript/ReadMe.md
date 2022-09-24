@@ -15,6 +15,7 @@ The DemiScript core class can be initialized with
 ```js
 new DemiScript();
 ```
+It is located in demiscript/demiscript.js
 The following arguments can be passed on initialization: canvas (string), folderpath (string), editor(bool)
 ```js
 new DemiScript(canvas, folderpath, editor);
